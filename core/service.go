@@ -84,6 +84,9 @@ type Service struct {
 
 	// NumberOfSuccessesInARow is the number of successful evaluations in a row
 	NumberOfSuccessesInARow int
+
+	// previousEtag is the ETag that was received in the last request to the service.
+	previousEtag string
 }
 
 // ValidateAndSetDefaults validates the service's configuration and sets the default value of fields that have one
@@ -226,6 +229,14 @@ func (service *Service) call(result *Result) {
 				result.AddError(err.Error())
 			}
 		}
+		if service.needsToReadETag() {
+			// This is pretty sub-prime, but it's the most straightforward
+			// way of smuggling the required state into the condition evaluation
+			// that I could think of without substantial re-architecturing.
+			result.previousEtag = service.previousEtag
+			result.etag = response.Header.Get("ETag")
+			service.previousEtag = result.etag
+		}
 	}
 }
 
@@ -254,6 +265,18 @@ func (service *Service) buildHTTPRequest() *http.Request {
 func (service *Service) needsToReadBody() bool {
 	for _, condition := range service.Conditions {
 		if condition.hasBodyPlaceholder() {
+			return true
+		}
+	}
+	return false
+}
+
+// needsToReadETag checks if there's any conditions that requires the response ETag header to be read
+func (service *Service) needsToReadETag() bool {
+	for _, condition := range service.Conditions {
+		// TODO Consider whether this would also be useful for general header-based conditions,
+		// not just reading the ETag header
+		if condition.hasModifiedPlaceholder() {
 			return true
 		}
 	}

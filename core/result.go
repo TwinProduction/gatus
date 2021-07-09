@@ -45,6 +45,13 @@ type Result struct {
 	// This means that the call Service.EvaluateHealth both populates the body (if necessary)
 	// and sets it to nil after the evaluation has been completed.
 	body []byte
+
+	// etag is from the ETag header recieved in the response
+	etag string
+
+	// previousEtag is the ETag that was received in the last request to the service.
+	// Used to check whether it changed since the last request.
+	previousEtag string
 }
 
 // AddError adds an error to the result's list of errors.
